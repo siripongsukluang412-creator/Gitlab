@@ -24,8 +24,8 @@ def analyze_dc(voltage_v, resistance_ohm):
     if not math.isfinite(voltage) or not math.isfinite(resistance):
         raise ValueError("Voltage and resistance must be finite numbers.")
 
-    if resistance == 0:
-        raise ValueError("Resistance cannot be zero in a DC circuit.")
+    if resistance <= 0:
+        raise ValueError("Resistance must be greater than zero in a DC circuit.")
 
     current_a = voltage / resistance
     power_w = voltage * current_a
