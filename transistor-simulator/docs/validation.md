@@ -126,7 +126,64 @@ IC  ≈ IE
 
 ทดสอบใน `tests/test_dc_bias.py::TestRegions`
 
-## 5. การตรวจสอบชั้น HTTP
+## 5. โหมด Fixed Bias
+
+สมการ:
+
+```text
+IB  = (VCC - VBE) / RB
+IC  = β * IB
+IE  = (β + 1) * IB
+VCE = VCC - IC * RC
+VE  = 0
+VC  = VCE
+VB  = VBE
+```
+
+ตัวอย่าง: `VCC = 12 V, RB = 470 kΩ, RC = 2.2 kΩ, β = 100, VBE = 0.7 V`
+
+| ปริมาณ | ค่า |
+|---|---|
+| IB | 24.0426 µA |
+| IC | 2.40426 mA |
+| IE | 2.42830 mA |
+| VCE | 6.7106 V |
+| VB | 0.7 V |
+| VC | 6.7106 V |
+| VE | 0 V |
+| Region | active |
+
+## 6. โหมด Emitter Bias (แหล่งจ่ายเดียว)
+
+สมการ:
+
+```text
+IB  = (VCC - VBE) / (RB + (β + 1) * RE)
+IC  = β * IB
+IE  = (β + 1) * IB
+VCE = VCC - IC * RC - IE * RE
+VE  = IE * RE
+VC  = VCC - IC * RC
+VB  = VE + VBE
+```
+
+ตัวอย่าง: `VCC = 12 V, RB = 470 kΩ, RC = 2.2 kΩ, RE = 1 kΩ, β = 100, VBE = 0.7 V`
+
+| ปริมาณ | ค่า |
+|---|---|
+| IB | 19.7898 µA |
+| IC | 1.97898 mA |
+| IE | 1.99877 mA |
+| VCE | 5.6475 V |
+| VB | 2.6988 V |
+| VC | 7.6462 V |
+| VE | 1.9988 V |
+| Region | active |
+
+ทั้งสองโหมดใช้ `VCC <= VBE` เป็น cutoff และ `VCE < 0.2 V` เป็น saturation
+เหมือนกับโหมด divider
+
+## 7. การตรวจสอบชั้น HTTP
 
 `tests/test_web.py` ตรวจ:
 
@@ -136,7 +193,7 @@ IC  ≈ IE
 - อินพุตผิด → 400 พร้อมข้อความ
 - cutoff / saturation แสดงสถานะถูกต้อง
 
-## 6. ข้อจำกัดของการตรวจสอบ
+## 8. ข้อจำกัดของการตรวจสอบ
 
 - ค่าอ้างอิงมาจากการคำนวณมือด้วยสมการเดียวกัน ไม่ได้เทียบกับ SPICE
 - `VCE_SAT = 0.2 V` เป็นค่าคงที่ typical ไม่ได้มาจาก datasheet

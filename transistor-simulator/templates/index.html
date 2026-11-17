@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lab 02: BJT DC Bias Web App — ENG29 2121</title>
+  <title>Lab 03: BJT DC Bias Web App — ENG29 2121</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -18,8 +18,8 @@
         </svg>
       </span>
       <div class="brand-text">
-        <h1>Lab 02: BJT DC Bias Web App</h1>
-        <p>ENG29 2121 – Common Emitter (Voltage Divider Bias)</p>
+        <h1>Lab 03: BJT DC Bias Web App</h1>
+        <p>ENG29 2121 – {{ mode_spec.subtitle }}</p>
       </div>
     </div>
     <div class="course-badge">
@@ -29,6 +29,13 @@
       <span>Computer Programming<br>for Electrical Engineers</span>
     </div>
   </header>
+
+  <nav class="mode-tabs" aria-label="Bias configuration">
+    {% for tab in mode_tabs %}
+    <a class="mode-tab{% if tab.id == mode %} active{% endif %}"
+       href="{{ url_for('index', mode=tab.id) }}">{{ tab.label }}</a>
+    {% endfor %}
+  </nav>
 
   <main class="layout">
 
@@ -42,6 +49,7 @@
       </h2>
 
       <form method="post" action="{{ url_for('calculate_bias') }}" novalidate>
+        <input type="hidden" name="mode" value="{{ mode }}">
         {% for f in fields %}
         <div class="field">
           <label class="field-label" for="{{ f.name }}">
@@ -85,27 +93,38 @@
           <circle cx="12" cy="18" r="2.2"/>
           <path d="M7.7 7.4 10.6 15.9M16.3 7.4 13.4 15.9M8.2 6h7.6"/>
         </svg>
-        Circuit: Common-Emitter Amplifier
+        {{ mode_spec.circuit_title }}
       </h2>
 
       <svg class="circuit" viewBox="0 0 300 310" role="img"
-           aria-label="Common-emitter amplifier with voltage-divider bias">
+           aria-label="{{ mode_spec.circuit_aria }}">
+        <g class="circuit-glow">
         <!-- VCC rail -->
         <line class="wire" x1="80" y1="50" x2="220" y2="50"/>
         <line class="wire" x1="220" y1="50" x2="220" y2="60"/>
         <text class="lbl-strong" x="150" y="32" text-anchor="middle">V_CC = {{ circuit.vcc }}</text>
 
+        {% if mode == "divider" %}
         <!-- R1 -->
         <line class="wire" x1="80" y1="50" x2="80" y2="62"/>
         <rect class="part" x="72" y="62" width="16" height="44" rx="2"/>
         <line class="wire" x1="80" y1="106" x2="80" y2="150"/>
         <text class="lbl" x="38" y="80">R_1</text>
         <text class="val" x="38" y="95">{{ circuit.r1 }}</text>
+        {% else %}
+        <!-- RB -->
+        <line class="wire" x1="80" y1="50" x2="80" y2="62"/>
+        <rect class="part" x="72" y="62" width="16" height="44" rx="2"/>
+        <line class="wire" x1="80" y1="106" x2="80" y2="150"/>
+        <text class="lbl" x="38" y="80">R_B</text>
+        <text class="val" x="38" y="95">{{ circuit.rb }}</text>
+        {% endif %}
 
         <!-- base node -->
         <circle class="dot" cx="80" cy="150" r="2.6"/>
         <line class="wire" x1="80" y1="150" x2="146" y2="150"/>
 
+        {% if mode == "divider" %}
         <!-- R2 -->
         <line class="wire" x1="80" y1="150" x2="80" y2="170"/>
         <rect class="part" x="72" y="170" width="16" height="44" rx="2"/>
@@ -117,6 +136,7 @@
         <line class="wire" x1="66" y1="240" x2="94" y2="240"/>
         <line class="wire" x1="71" y1="246" x2="89" y2="246"/>
         <line class="wire" x1="76" y1="252" x2="84" y2="252"/>
+        {% endif %}
 
         <!-- transistor -->
         <circle class="part" cx="162" cy="150" r="27"/>
@@ -139,16 +159,22 @@
         <text class="lbl" x="236" y="80">R_C</text>
         <text class="val" x="236" y="95">{{ circuit.rc }}</text>
 
+        {% if mode in ("divider", "emitter") %}
         <!-- RE -->
         <rect class="part" x="162" y="200" width="16" height="44" rx="2"/>
         <line class="wire" x1="170" y1="244" x2="170" y2="270"/>
         <text class="lbl" x="186" y="218">R_E</text>
         <text class="val" x="186" y="233">{{ circuit.re }}</text>
+        {% else %}
+        <!-- fixed bias: emitter is grounded directly -->
+        <line class="wire" x1="170" y1="200" x2="170" y2="270"/>
+        {% endif %}
 
         <!-- ground (right) -->
         <line class="wire" x1="156" y1="270" x2="184" y2="270"/>
         <line class="wire" x1="161" y1="276" x2="179" y2="276"/>
         <line class="wire" x1="166" y1="282" x2="174" y2="282"/>
+        </g>
       </svg>
     </section>
 
