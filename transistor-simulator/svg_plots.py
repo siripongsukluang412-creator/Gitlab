@@ -16,7 +16,8 @@ Two public helpers exist:
 All values are SI on input; labels convert to the display units named in
 the axis titles (Hz, dB, degrees, ms, mV).
 
-Every chart embeds a small self-contained script that provides:
+Each chart embeds its data as JSON and the marker/tooltip controls live in
+``static/chart-interactive.js``, which provides:
 
 * hover / touch scrubbing with a live value readout tooltip,
 * a Play / Pause toggle that animates a marker along the waveforms,
@@ -175,148 +176,6 @@ def _data_script(id_name: str, data: dict) -> str:
     return f'<script id="{id_name}" type="application/json">{payload}</script>'
 
 
-def _interactive_script() -> str:
-    """Return the self-contained JS that drives hover, scrub, and animation."""
-    return (
-        '<script type="text/javascript">'
-        "(function(){"
-        "var dataEl=document.getElementById('chart-data');"
-        "if(!dataEl){return;}"
-        "var data=JSON.parse(dataEl.textContent || dataEl.textContent);"
-        "var svg=dataEl.ownerSVGElement || document.querySelector('svg');"
-        "if(!svg){return;}"
-        "var root=svg.ownerSVGElement || svg;"
-        "var width=root.clientWidth || 780;"
-        "var height=root.clientHeight || 400;"
-        "var marginLeft=82;"
-        "var marginRight=24;"
-        "var x0=marginLeft;"
-        "var x1=width-marginRight;"
-        "var plotTop=52;"
-        "var plotBottom=342;"
-        "var tooltip=root.querySelector('.chart-tooltip');"
-        "var tipBox=tooltip ? tooltip.querySelector('rect') : null;"
-        "var tipText=tooltip ? tooltip.querySelector('text') : null;"
-        "var guide=root.querySelector('.chart-guide');"
-        "var markers=[];"
-        "root.querySelectorAll('.chart-marker').forEach(function(m){markers.push(m);});"
-        "var scrubBar=root.querySelector('.chart-scrub-bar');"
-        "var scrubKnob=root.querySelector('.chart-scrub-knob');"
-        "var playBtn=root.querySelector('.chart-play');"
-        "var playing=false;"
-        "var animId=null;"
-        "var index=0;"
-        "var n=data.freq ? data.freq.length : (data.time ? data.time.length : 0);"
-        "function mapLog(v,fmin,fmax,xa,xb){"
-        "  var lo=Math.log10(Math.max(fmin,1e-12));"
-        "  var hi=Math.log10(Math.max(fmax,1e-11));"
-        "  if(Math.abs(hi-lo)<1e-9){return (xa+xb)/2;}"
-        "  var frac=(Math.log10(Math.max(v,1e-12))-lo)/(hi-lo);"
-        "  return xa+frac*(xb-xa);"
-        "}"
-        "function mapLin(v,vmin,vmax,ya,yb){"
-        "  if(Math.abs(vmax-vmin)<1e-9){return (ya+yb)/2;}"
-        "  var frac=(v-vmin)/(vmax-vmin);"
-        "  return yb-frac*(yb-ya);"
-        "}"
-        "function nearestIndex(xpx){"
-        "  var best=0;var bestDist=1e18;"
-        "  for(var i=0;i<n;i++){"
-        "    var px=data.freq ? mapLog(data.freq[i],data.fmin,data.fmax,x0,x1) :"
-        "      x0+(data.time[i]-data.tmin)/(data.tmax-data.tmin)*(x1-x0);"
-        "    var d=Math.abs(px-xpx);"
-        "    if(d<bestDist){bestDist=d;best=i;}"
-        "  }"
-        "  return best;"
-        "}"
-        "function showTip(i,xpx,ypx,label){"
-        "  if(!tooltip||!tipText){return;}"
-        "  tipText.textContent=label;"
-        "  tooltip.setAttribute('transform','translate('+(xpx+12)+','+(ypx-28)+')');"
-        "  tooltip.setAttribute('visibility','visible');"
-        "}"
-        "function hideTip(){"
-        "  if(tooltip){tooltip.setAttribute('visibility','hidden');}"
-        "  if(guide){guide.setAttribute('visibility','hidden');}"
-        "  markers.forEach(function(m){m.setAttribute('visibility','hidden');});"
-        "}"
-        "function setMarker(i){"
-        "  markers.forEach(function(m){m.setAttribute('visibility','hidden');});"
-        "  var px=data.freq ? mapLog(data.freq[i],data.fmin,data.fmax,x0,x1) :"
-        "    x0+(data.time[i]-data.tmin)/(data.tmax-data.tmin)*(x1-x0);"
-        "  markers.forEach(function(m,k){"
-        "    var py=data.freq ? (k===0 ? mapLin(data.gain[i],data.gmin,data.gmax,plotTop,plotBottom-154) : mapLin(data.phase[i],data.pmin,data.pmax,plotTop+146,plotBottom-154)) :"
-        "      (k===0 ? mapLin(data.vin[i],data.vmin,data.vmax,plotTop,plotBottom) : mapLin(data.vout[i],data.vmin,data.vmax,plotTop,plotBottom)));"
-        "    m.setAttribute('cx',px);"
-        "    m.setAttribute('cy',py);"
-        "    m.setAttribute('visibility','visible');"
-        "  });"
-        "  if(guide){"
-        "    guide.setAttribute('x1',px);guide.setAttribute('x2',px);"
-        "    guide.setAttribute('y1',plotTop);guide.setAttribute('y2',plotBottom);"
-        "    guide.setAttribute('visibility','visible');"
-        "  }"
-        "  if(scrubKnob){"
-        "    var frac=i/(n-1);"
-        "    var kx=x0+frac*(x1-x0);"
-        "    scrubKnob.setAttribute('cx',kx);"
-        "  }"
-        "}"
-        "function onPointer(evt){"
-        "  var pt=svg.createSVGPoint();"
-        "  var cx=evt.clientX,cy=evt.clientY;"
-        "  var box=svg.getBoundingClientRect();"
-        "  var sx=(cx-box.left)/(box.right-box.left)*width;"
-        "  var sy=(cy-box.top)/(box.bottom-box.top)*height;"
-        "  pt.x=sx;pt.y=sy;"
-        "  var p=pt.matrixTransform(svg.getScreenCTM().inverse());"
-        "  var i=nearestIndex(p.x);"
-        "  if(data.freq){"
-        "    var gx=mapLog(data.freq[i],data.fmin,data.fmax,x0,x1);"
-        "    var gy=mapLin(data.gain[i],data.gmin,data.gmax,plotTop,plotBottom-154);"
-        "    var py=mapLin(data.phase[i],data.pmin,data.pmax,plotTop+146,plotBottom-154);"
-        "    setMarker(i);"
-        "    showTip(i,gx,gy,'f='+data.freq[i].toFixed(2)+'Hz  gain='+data.gain[i].toFixed(2)+'dB  phase='+data.phase[i].toFixed(1)+'°');"
-        "  }else{"
-        "    var tx=x0+(data.time[i]-data.tmin)/(data.tmax-data.tmin)*(x1-x0);"
-        "    var vy=mapLin(data.vin[i],data.vmin,data.vmax,plotTop,plotBottom);"
-        "    setMarker(i);"
-        "    showTip(i,tx,vy,'t='+data.time[i].toFixed(4)+'s  Vin='+data.vin[i].toFixed(4)+'V  Vout='+data.vout[i].toFixed(4)+'V');"
-        "  }"
-        "}"
-        "if(root){"
-        "  root.addEventListener('mousemove',function(e){onPointer(e);});"
-        "  root.addEventListener('touchmove',function(e){e.preventDefault();onPointer(e.touches[0]);},{passive:false});"
-        "  root.addEventListener('mouseleave',hideTip);"
-        "  root.addEventListener('touchend',hideTip);"
-        "}"
-        "if(playBtn){"
-        "  playBtn.addEventListener('click',function(){"
-        "    playing=!playing;"
-        "    playBtn.textContent=playing?'Pause':'Play';"
-        "    if(playing){step();}else{if(animId){cancelAnimationFrame(animId);animId=null;}}"
-        "  });"
-        "}"
-        "function step(){"
-        "  if(!playing){return;}"
-        "  index=(index+1)%n;"
-        "  setMarker(index);"
-        "  animId=requestAnimationFrame(step);"
-        "}"
-        "if(scrubBar&&scrubKnob){"
-        "  scrubBar.addEventListener('click',function(e){"
-        "    var box=svg.getBoundingClientRect();"
-        "    var sx=(e.clientX-box.left)/(box.right-box.left)*width;"
-        "    var i=Math.round((sx-x0)/(x1-x0)*(n-1));"
-        "    if(i<0)i=0;if(i>=n)i=n-1;"
-        "    setMarker(i);"
-        "  });"
-        "}"
-        "})();"
-        "</script>"
-    )
-
-
 def _tooltip_group() -> str:
     """Return the hidden tooltip group placed inside the chart SVG."""
     return (
@@ -342,8 +201,8 @@ def _scrub_controls(
         f'<rect class="chart-play" x="{x0 - 4:.1f}" y="{knob_y + 12:.1f}" '
         f'width="34" height="18" rx="6" fill="#0f172a" stroke="#38bdf8" '
         'stroke-width="1" cursor="pointer" />'
-        f'<text x="{x0 + 13:.1f}" y="{knob_y + 27:.1f}" font-size="11" '
-        f'fill="#e2e8f0" text-anchor="middle" cursor="pointer">Play</text>'
+        f'<text class="chart-play-label" x="{x0 + 13:.1f}" y="{knob_y + 27:.1f}" '
+        'font-size="11" fill="#e2e8f0" text-anchor="middle" cursor="pointer">Play</text>'
     )
 
 
@@ -465,7 +324,6 @@ def bode_svg(
             },
         )
     )
-    parts.append(_interactive_script())
 
     parts.append("</svg>")
     return "".join(parts)
@@ -560,7 +418,6 @@ def transient_svg(
             },
         )
     )
-    parts.append(_interactive_script())
 
     parts.append("</svg>")
     return "".join(parts)
